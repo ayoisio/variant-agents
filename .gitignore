@@ -1,0 +1,107 @@
+# General & OS Specific
+# ---------------------
+# Operating System files
+.DS_Store
+Thumbs.db
+._*
+.Spotlight-V100
+.Trashes
+
+# Editor & IDE directories
+.vscode/
+*.idea/
+*.swp
+*~
+
+# Log files
+*.log
+*.log.*
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend (Node.js / Next.js / TypeScript)
+# ------------------------------------------
+# Dependencies
+*node_modules/
+
+# Build output
+*.next/
+/out/
+/build/
+package-lock.json
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Vercel deployment output
+.vercel/
+
+# Test reports and coverage
+/coverage/
+.nyc_output/
+junit.xml
+
+# TypeScript cache files
+*.tsbuildinfo
+
+
+# Backend (Python / FastAPI / ADK)
+# --------------------------------
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+# Use a leading slash to only ignore top-level venvs
+/.venv/
+/venv/
+/env/
+
+# Environment variables for the backend
+/.env
+
+# Distribution / packaging artifacts
+/dist/
+sdist/
+*.egg-info/
+*.egg
+wheels/
+MANIFEST
+
+# Test reports and coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Databases
+# Ignore local development databases
+*.sqlite3
+db.sqlite3
+
+# Deployment & Infrastructure
+# ---------------------------
+# Docker
+# Ignore local overrides for docker-compose
+docker-compose.override.yml
+
+# Sensitive Information & Credentials
+# ----------------------------------------------------
+# Service account keys and other credential files
+*.pem
+*.key
+*.cer
+*service-account*.json
+*gcp-credentials*.json
+
+# Other potential secret files
+secrets.yml
+credentials.yml

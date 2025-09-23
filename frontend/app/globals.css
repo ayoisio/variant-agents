@@ -1,0 +1,313 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode - DNA-inspired blue-green-purple spectrum */
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Primary - Deep genomic blue */
+    --primary: 217 91% 50%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Secondary - Bioinformatic teal */
+    --secondary: 173 80% 40%;
+    --secondary-foreground: 210 40% 98%;
+
+    /* Accent - Scientific purple */
+    --accent: 262 83% 58%;
+    --accent-foreground: 210 40% 98%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 217 91% 50%;
+
+    --radius: 0.75rem;
+
+    /* Custom gradient stops for DNA helix effect */
+    --gradient-1: 217 91% 50%;  /* Blue */
+    --gradient-2: 173 80% 40%;  /* Teal */
+    --gradient-3: 262 83% 58%;  /* Purple */
+    --gradient-4: 280 87% 70%;  /* Light purple */
+
+    /* Chart colors for data visualization */
+    --chart-1: 217 91% 50%;
+    --chart-2: 173 80% 40%;
+    --chart-3: 262 83% 58%;
+    --chart-4: 143 64% 40%;
+    --chart-5: 199 89% 48%;
+
+    /* Status colors */
+    --success: 142 76% 36%;
+    --warning: 45 93% 47%;
+    --info: 199 89% 48%;
+  }
+
+  .dark {
+    /* Dark mode - Deep space genomics theme */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Primary - Luminous blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    /* Secondary - Bio teal */
+    --secondary: 173 80% 50%;
+    --secondary-foreground: 210 40% 98%;
+
+    /* Accent - Plasma purple */
+    --accent: 262 83% 68%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 217 91% 60%;
+
+    /* Dark mode gradients */
+    --gradient-1: 217 91% 60%;
+    --gradient-2: 173 80% 50%;
+    --gradient-3: 262 83% 68%;
+    --gradient-4: 280 87% 75%;
+
+    /* Dark chart colors */
+    --chart-1: 217 91% 60%;
+    --chart-2: 173 80% 50%;
+    --chart-3: 262 83% 68%;
+    --chart-4: 143 64% 50%;
+    --chart-5: 199 89% 58%;
+
+    /* Dark status colors */
+    --success: 142 76% 46%;
+    --warning: 45 93% 57%;
+    --info: 199 89% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth transitions for theme switching */
+  html.transitioning,
+  html.transitioning *,
+  html.transitioning *:before,
+  html.transitioning *:after {
+    transition: all 300ms !important;
+    transition-delay: 0 !important;
+  }
+}
+
+@layer components {
+  /* DNA Helix gradient backgrounds */
+  .gradient-radial {
+    background: radial-gradient(
+      ellipse at center,
+      hsl(var(--gradient-1) / 0.15) 0%,
+      hsl(var(--gradient-2) / 0.1) 25%,
+      hsl(var(--gradient-3) / 0.05) 50%,
+      transparent 70%
+    );
+  }
+
+  .gradient-aurora {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--gradient-1)) 0%,
+      hsl(var(--gradient-2)) 25%,
+      hsl(var(--gradient-3)) 50%,
+      hsl(var(--gradient-4)) 75%,
+      hsl(var(--gradient-1)) 100%
+    );
+    background-size: 400% 400%;
+    animation: aurora 15s ease infinite;
+  }
+
+  @keyframes aurora {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Genomic card with subtle glow */
+  .genomic-card {
+    @apply relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card)) 0%,
+      hsl(var(--card) / 0.98) 100%
+    );
+  }
+
+  .genomic-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--gradient-2) / 0.5),
+      transparent
+    );
+  }
+
+  /* Status indicators with glow */
+  .status-processing {
+    @apply relative;
+    box-shadow: 0 0 20px hsl(var(--gradient-2) / 0.3);
+  }
+
+  .status-processing::before {
+    content: '';
+    @apply absolute inset-0 rounded-full;
+    background: hsl(var(--gradient-2));
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.1; }
+  }
+
+  /* DNA double helix loader */
+  .dna-loader {
+    @apply relative w-16 h-16;
+  }
+
+  .dna-loader::before,
+  .dna-loader::after {
+    content: '';
+    @apply absolute inset-0 rounded-full border-4;
+    border-color: hsl(var(--gradient-1)) transparent hsl(var(--gradient-3)) transparent;
+    animation: dna-rotate 2s linear infinite;
+  }
+
+  .dna-loader::after {
+    animation-delay: 0.5s;
+    border-color: hsl(var(--gradient-2)) transparent hsl(var(--gradient-4)) transparent;
+  }
+
+  @keyframes dna-rotate {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(0.8); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+    transition: background 0.2s;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
+  /* Selection colors */
+  ::selection {
+    background: hsl(var(--gradient-2) / 0.3);
+    color: hsl(var(--foreground));
+  }
+
+  /* Focus visible improvements */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-background/60 backdrop-blur-xl border-border/50;
+    box-shadow:
+      0 8px 32px 0 hsl(var(--gradient-1) / 0.1),
+      inset 0 0 0 1px hsl(var(--gradient-2) / 0.1);
+  }
+
+  /* Animated gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--gradient-1)),
+      hsl(var(--gradient-2)),
+      hsl(var(--gradient-3))
+    );
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}
+
+@layer utilities {
+  /* Animations */
+  .animate-in {
+    animation: animateIn 0.3s ease-out;
+  }
+
+  @keyframes animateIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+}

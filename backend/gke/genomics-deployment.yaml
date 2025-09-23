@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: genomics-agent-ksa
+  annotations:
+    iam.gke.io/gcp-service-account: firebase-adminsdk-fbsvc@variant-intake-agents.iam.gserviceaccount.com
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genomics-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genomics-agent
+  template:
+    metadata:
+      labels:
+        app: genomics-agent
+    spec:
+      serviceAccountName: genomics-agent-ksa
+      containers:
+      - name: genomics-agent
+        image: us-central1-docker.pkg.dev/variant-intake-agents/prod/genomics-agent:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: GOOGLE_CLOUD_PROJECT
+          value: "variant-intake-agents"
+        - name: GCP_PROJECT_ID
+          value: "variant-intake-agents"
+        - name: AGENT_ENGINE_ID
+          value: "9111279025426268160"
+        - name: USE_VERTEX_AI_SESSIONS
+          value: "true"
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gemini-api-key-secret
+              key: key
+        - name: TASKS_QUEUE_LOCATION
+          value: "us-central1"
+        - name: TASKS_QUEUE_NAME
+          value: "background"
+        - name: WORKER_URL
+          value: "http://PENDING-GKE-IP/worker/run-vep"
+        - name: VEP_FORK_COUNT
+          value: "28"
+        resources:
+          requests:
+            cpu: "30"
+            memory: "120Gi"
+          limits:
+            cpu: "32"
+            memory: "240Gi"
+        volumeMounts:
+        - name: vep-cache
+          mountPath: /mnt/cache
+          readOnly: true
+      volumes:
+      - name: vep-cache
+        gcePersistentDisk:
+          pdName: vep-cache-disk
+          fsType: ext4
+          readOnly: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genomics-agent-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: genomics-agent
