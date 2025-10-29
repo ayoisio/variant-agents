@@ -118,7 +118,7 @@ The presence of this pathogenic variant indicates an increased genetic predispos
         {/* Messages */}
         <div className="space-y-6 min-h-[700px]">
           {/* User message */}
-          <div className="flex gap-3 flex-row-reverse">
+          <div className="flex gap-3 flex-row-reverse items-start">
             <div className="flex-shrink-0">
               <div className="w-8 h-8 rounded overflow-hidden bg-gray-900 flex items-center justify-center">
                 <User className="h-4 w-4 text-gray-400" />
@@ -126,7 +126,15 @@ The presence of this pathogenic variant indicates an increased genetic predispos
             </div>
 
             <div className="flex-1 space-y-1">
-              <Card className="border bg-gray-950 border-gray-800 inline-block ml-auto">
+              <div className="flex items-center gap-2 font-mono text-xs justify-end">
+                <span className="text-gray-600">USER</span>
+                <span className="text-gray-700">@</span>
+                <span className="text-gray-600">
+                  {new Date().toLocaleTimeString('en-US', { hour12: false })}
+                </span>
+              </div>
+
+              <Card className="border bg-gray-950 border-gray-800 inline-block">
                 <div className="p-3">
                   <div className="font-mono text-xs text-gray-300">
                     {isPlaying ? (
