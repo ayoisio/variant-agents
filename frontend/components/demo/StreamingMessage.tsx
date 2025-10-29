@@ -81,8 +81,8 @@ export function StreamingMessage({
               <ReactMarkdown
                 components={{
                   p: ({ children }) => <p className="mb-2">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                  ul: ({ children }) => <ul className="list-disc list-outside ml-4 mb-2 space-y-1">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal list-outside ml-4 mb-2 space-y-1">{children}</ol>,
                   strong: ({ children }) => <strong className="text-green-400 font-semibold">{children}</strong>,
                   code: ({ children }) => <code className="bg-gray-900 px-1 py-0.5 rounded text-green-400">{children}</code>,
                 }}
