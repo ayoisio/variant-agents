@@ -114,8 +114,8 @@ export default function ApobPopulationsDemo() {
               </div>
             </div>
 
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center gap-2 font-mono text-xs justify-end">
+            <div className="flex-1 flex flex-col items-end space-y-1">
+              <div className="flex items-center gap-2 font-mono text-xs">
                 <span className="text-gray-600">USER</span>
                 <span className="text-gray-700">@</span>
                 <span className="text-gray-600">
@@ -123,7 +123,7 @@ export default function ApobPopulationsDemo() {
                 </span>
               </div>
 
-              <Card className="border bg-gray-950 border-gray-800 inline-block">
+              <Card className="border bg-gray-950 border-gray-800">
                 <div className="p-3">
                   <div className="font-mono text-xs text-gray-300">
                     {isPlaying ? (
