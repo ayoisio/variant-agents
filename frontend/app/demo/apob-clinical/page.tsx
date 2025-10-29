@@ -125,16 +125,8 @@ The presence of this pathogenic variant indicates an increased genetic predispos
               </div>
             </div>
 
-            <div className="flex-1 space-y-1 items-end">
-              <div className="flex items-center gap-2 font-mono text-xs justify-end">
-                <span className="text-gray-600">USER</span>
-                <span className="text-gray-700">@</span>
-                <span className="text-gray-600">
-                  {new Date().toLocaleTimeString('en-US', { hour12: false })}
-                </span>
-              </div>
-
-              <Card className="border bg-gray-950 border-gray-800 inline-block">
+            <div className="flex-1 space-y-1">
+              <Card className="border bg-gray-950 border-gray-800 inline-block ml-auto">
                 <div className="p-3">
                   <div className="font-mono text-xs text-gray-300">
                     {isPlaying ? (

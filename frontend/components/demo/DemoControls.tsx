@@ -17,7 +17,7 @@ export function DemoControls({
   onRestart
 }: DemoControlsProps) {
   return (
-    <div className="fixed top-4 right-4 z-50">
+    <div className="fixed top-2 right-20 z-50">
       <div className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-lg p-2 shadow-lg">
         {isPlaying ? (
           <Button
