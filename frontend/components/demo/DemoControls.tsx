@@ -17,14 +17,15 @@ export function DemoControls({
   onRestart
 }: DemoControlsProps) {
   return (
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
-      <div className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-lg p-2">
+    <div className="fixed top-4 right-4 z-50">
+      <div className="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-lg p-2 shadow-lg">
         {isPlaying ? (
           <Button
             variant="ghost"
             size="icon"
             onClick={onPause}
             className="h-8 w-8 hover:bg-gray-900"
+            title="Pause"
           >
             <Pause className="h-4 w-4 text-gray-400" />
           </Button>
@@ -34,6 +35,7 @@ export function DemoControls({
             size="icon"
             onClick={onPlay}
             className="h-8 w-8 hover:bg-gray-900"
+            title="Play"
           >
             <Play className="h-4 w-4 text-green-500" />
           </Button>
@@ -44,6 +46,7 @@ export function DemoControls({
           size="icon"
           onClick={onRestart}
           className="h-8 w-8 hover:bg-gray-900"
+          title="Restart"
         >
           <RotateCcw className="h-4 w-4 text-gray-400" />
         </Button>
