@@ -23,7 +23,7 @@ interface DynamicChartProps {
   chartType?: string;
   title?: string;
   height?: number;
-  width?: string | number;
+  width?: number | `${number}%`;
   colorScheme?: string[];
 }
 
