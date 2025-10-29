@@ -134,13 +134,13 @@ export function PopulationHeatmap({
                 </div>
 
                 {/* Frequency value */}
-                <div className="w-20 flex-shrink-0 text-right font-mono text-xs">
+                <div className="w-24 flex-shrink-0 text-right font-mono text-xs">
                   {hasData ? (
                     <span className="text-gray-400">
-                      {(pop.frequency * 100).toFixed(3)}
+                      {pop.frequency.toFixed(5)}%
                     </span>
                   ) : (
-                    <span className="text-gray-700">0</span>
+                    <span className="text-gray-700">0%</span>
                   )}
                 </div>
               </div>
