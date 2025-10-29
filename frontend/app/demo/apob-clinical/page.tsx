@@ -14,7 +14,11 @@ export default function ApobClinicalDemo() {
 
   const userQuery = "What is the clinical significance of APOB?";
   
-  const assistantResponse = `The **APOB gene** (Apolipoprotein B) is clinically significant due to its crucial role in **lipid metabolism** and its association with several inherited disorders. Here's a breakdown of its clinical significance:
+  const assistantResponse = `The **APOB gene** (Apolipoprotein B) is clinically significant due to its crucial role in **lipid metabolism** and its association with several inherited disorders.
+
+**Variant Identified:** In your analysis, one **Pathogenic/Likely Pathogenic variant** (\`2:21006087:C>T\`) was identified in the APOB gene, suggesting a potential impact on lipid metabolism and warranting clinical follow-up.
+
+Here's a comprehensive breakdown of APOB's clinical significance:
 
 **1. Function:**
 
@@ -30,15 +34,13 @@ Pathogenic variants in the APOB gene are primarily associated with disorders of 
 
 **3. Clinical Implications:**
 
-The presence of pathogenic or likely pathogenic variants in APOB indicates an increased genetic predisposition to these lipid disorders. This warrants:
+The presence of this pathogenic variant indicates an increased genetic predisposition to lipid disorders. This warrants:
 
 * **Further Clinical Evaluation:** To assess the individual's lipid profile and clinical presentation.
 
 * **Genetic Counseling:** To discuss inheritance patterns, potential health risks, and management strategies.
 
-* **Family Screening:** To identify other affected or at-risk family members.
-
-**In your case**, one **Pathogenic/Likely Pathogenic variant** was identified in the APOB gene (\`2:21006087:C>T\`), which suggests a potential impact on lipid metabolism and warrants clinical follow-up.`;
+* **Family Screening:** To identify other affected or at-risk family members.`;
 
   useEffect(() => {
     if (isPlaying) {
