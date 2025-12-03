@@ -6,14 +6,6 @@
   <p align="center">
     <strong>Enterprise-grade genomic variant analysis powered by Google Cloud and Gemini</strong>
   </p>
-  
-  <p align="center">
-    <a href="#features">Features</a> •
-    <a href="#architecture">Architecture</a> •
-    <a href="#quick-start">Quick Start</a> •
-    <a href="#demo">Demo</a> •
-    <a href="#documentation">Documentation</a>
-  </p>
 
   <p align="center">
     <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python" />
@@ -103,9 +95,6 @@ A production-ready platform that transforms whole-genome variant analysis from a
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
-   cp .env.example .env
-   # Configure your API keys and GCP settings
-   python main.py
    ```
 
 4. **Access the application**
