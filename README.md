@@ -54,33 +54,7 @@ A production-ready platform that transforms whole-genome variant analysis from a
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TB
-    subgraph "Frontend - Next.js"
-        UI[React UI]
-        Auth[Firebase Auth]
-        SSE[SSE Client]
-    end
-    
-    subgraph "Backend - GKE"
-        API[FastAPI Server]
-        ADK[ADK Agents]
-        VEP[VEP Worker]
-    end
-    
-    subgraph "Data & Storage"
-        GCS[Cloud Storage]
-        BQ[BigQuery/gnomAD]
-        FS[Firestore]
-    end
-    
-    UI --> API
-    API --> ADK
-    ADK --> VEP
-    ADK --> BQ
-    VEP --> GCS
-    API --> FS
-```
+![architecture](/frontend/public/architecture.png)
 
 ### Technology Stack
 
