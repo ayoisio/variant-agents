@@ -37,6 +37,7 @@ package-lock.json
 .env.test.local
 .env.production.local
 .env*.local
+env.yaml
 
 # Vercel deployment output
 .vercel/
