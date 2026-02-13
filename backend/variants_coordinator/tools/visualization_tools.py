@@ -74,6 +74,18 @@ async def generate_chart_data_tool(
 
         tool_logger.info(f"Loaded {len(annotations)} annotations in {analysis_mode} mode")
 
+        # Pre-filter annotations by gene if a gene filter is specified
+        # This ensures all chart types (including heatmaps) respect the gene filter
+        if filters and "gene" in filters:
+            gene_filter = filters["gene"].upper()
+            annotations = {
+                vid: ann for vid, ann in annotations.items()
+                if ann.gene_symbol and ann.gene_symbol.upper() == gene_filter
+            }
+            # Also filter frequencies to match
+            frequencies = {vid: freq for vid, freq in frequencies.items() if vid in annotations}
+            tool_logger.info(f"Pre-filtered to {len(annotations)} annotations for gene {gene_filter}")
+
         # Initialize chart service
         chart_service = ChartDataService(
             annotations=annotations,
