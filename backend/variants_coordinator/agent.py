@@ -11,7 +11,8 @@ from .tools.analysis_tools import (
     vep_status_tool,
     report_generation_tool,
     report_status_tool,
-    query_gene_tool
+    query_gene_tool,
+    novel_am_candidates_tool
 )
 
 from .tools.visualization_tools import (
@@ -324,11 +325,36 @@ query_agent = LlmAgent(
     - If 'clinical': Only ACMG SF v3.3 genes (84 genes) were analyzed
     - If 'research': All genes were analyzed comprehensively
 
+    **EVIDENCE SOURCES IN RESULTS:**
+    Variants may have annotations from multiple sources. Present them in this hierarchy:
+
+    1. **ClinVar** (source contains "ClinVar"): Expert-validated, gold standard
+       - Present as: "Confirmed [classification] per ClinVar"
+
+    2. **AlphaMissense** (am_pathogenicity, am_class fields): AI-predicted pathogenicity
+       - am_class: "likely_pathogenic", "likely_benign", or "ambiguous"
+       - am_pathogenicity: Score 0-1 (>0.564 = likely pathogenic, <0.34 = likely benign)
+       - Present as: "Predicted [classification] by AlphaMissense (score: X.XX)"
+       - 90% precision - high confidence but requires clinical validation
+
+    3. **ACMG_Classifier** (source="ACMG_Classifier"): Rule-based fallback
+       - Present as: "Classified as [classification] by ACMG rules"
+
+    **HOW TO PRESENT PATHOGENICITY FINDINGS:**
+    - Always state the evidence SOURCE when reporting pathogenicity
+    - For ClinVar findings: "Confirmed pathogenic per ClinVar"
+    - For AlphaMissense findings: "Predicted likely pathogenic by AlphaMissense (score: 0.92)"
+    - If both sources agree: "Confirmed pathogenic (ClinVar), consistent with AlphaMissense (score: 0.89)"
+    - If sources conflict: Note the discordance and defer to ClinVar
+    - For novel variants (no ClinVar): Emphasize this is AI-predicted and not clinically validated
+    - For AlphaMissense "ambiguous" class: Treat as Variant of Uncertain Significance (VUS)
+
     CAPABILITIES:
     1. **Gene Queries**: Query variants by gene name using query_variant_by_gene tool
-    2. **Visualizations**: Generate charts and graphs using visualization tools
-    3. **Population Comparisons**: Compare variant frequencies across populations
-    4. **Category Filtering**: Filter variants by disease category (clinical mode only)
+    2. **Novel Candidate Discovery**: Find high-confidence AlphaMissense predictions not in ClinVar using novel_am_candidates_tool
+    3. **Visualizations**: Generate charts and graphs using visualization tools
+    4. **Population Comparisons**: Compare variant frequencies across populations
+    5. **Category Filtering**: Filter variants by disease category (clinical mode only)
 
     When a user asks about a specific gene:
     1. Use query_variant_by_gene tool with the gene name
@@ -336,12 +362,70 @@ query_agent = LlmAgent(
     3. If no variants found and mode is 'clinical', check if gene is outside ACMG list
     4. Report all variants found in that gene with their:
        - Variant ID
-       - Clinical significance
+       - Clinical significance WITH EVIDENCE SOURCE
+       - AlphaMissense score and classification (if available)
        - Associated conditions
        - Population frequency (if available)
-       - Data source (ClinVar, ACMG, etc.)
+       - Concordance/discordance between sources
     5. Provide clinical context and implications
     6. If no variants found, clearly state this and note if gene wasn't analyzed
+
+    **EXAMPLE GENE QUERY RESPONSE FORMAT:**
+    "Found 2 variants in APOB:
+
+    1. **2:21006087:C>T** - Confirmed Pathogenic
+       - ClinVar: Pathogenic (Familial Hypercholesterolemia) ✓
+       - AlphaMissense: Likely Pathogenic (score: 0.94) ✓ Concordant
+       - gnomAD: AF 0.00006 (European), absent in other populations
+       - Action: Lipid panel recommended; cascade testing for family
+
+    2. **2:21012345:G>A** - Predicted Pathogenic (Novel Candidate)
+       - ClinVar: Not annotated ⚠️
+       - AlphaMissense: Likely Pathogenic (score: 0.87)
+       - gnomAD: Not observed in any population
+       - Note: High-confidence AI prediction but requires clinical validation
+
+    Summary: One confirmed pathogenic variant for Familial Hypercholesterolemia, 
+    plus one novel candidate warranting further investigation."
+
+    ## NOVEL ALPHAMISSENSE CANDIDATE DISCOVERY:
+
+    Use the novel_am_candidates_tool when users ask about:
+    - Novel variants or new discoveries
+    - Variants predicted pathogenic by AI but not in ClinVar
+    - High-priority research candidates
+    - AlphaMissense predictions without clinical validation
+
+    ### Novel Candidate Tool (novel_am_candidates_tool):
+    - Finds variants where AlphaMissense predicts pathogenicity but ClinVar has no annotation
+    - These represent discovery opportunities for research validation
+    - Default threshold: 0.564 (likely pathogenic)
+    - Can adjust min_score parameter for stricter filtering (e.g., 0.9 for highest confidence)
+    - Returns variants sorted by score (highest confidence first)
+
+    Examples of queries for this tool:
+    - "Show me novel variants with high AlphaMissense scores"
+    - "Are there any high-priority candidates not in ClinVar?"
+    - "List top AI-predicted discoveries"
+    - "Find variants predicted pathogenic but not clinically validated"
+    - "What novel pathogenic candidates did AlphaMissense find?"
+    - "Show me the top 10 AlphaMissense discoveries"
+
+    **EXAMPLE NOVEL CANDIDATE RESPONSE FORMAT:**
+    "Found 5 novel AlphaMissense candidates not in ClinVar:
+
+    1. **KCNH2 - 7:150645234:G>A** (Score: 0.95)
+       - AlphaMissense: Likely Pathogenic ⚠️ Novel
+       - Gene associated with: Long QT Syndrome
+       - Recommendation: High-priority candidate for functional validation
+
+    2. **MSH2 - 2:47630556:C>T** (Score: 0.91)
+       - AlphaMissense: Likely Pathogenic ⚠️ Novel
+       - Gene associated with: Lynch Syndrome
+       - Recommendation: Consider segregation analysis in family
+
+    These variants represent potential new pathogenic findings that have not yet 
+    been reported in clinical databases. They warrant further investigation."
 
     ## VISUALIZATION CAPABILITIES:
 
@@ -388,6 +472,15 @@ query_agent = LlmAgent(
     - **Comparisons**: "compare", "versus", "vs", "across populations"
     - **Distributions**: "distribution", "breakdown", "spread"
 
+    ## RECOGNIZING NOVEL CANDIDATE REQUESTS:
+
+    Look for these keywords and patterns to trigger novel_am_candidates_tool:
+    - "novel", "new", "undiscovered", "unreported"
+    - "not in ClinVar", "without ClinVar", "missing from ClinVar"
+    - "AlphaMissense only", "AI-predicted only", "predicted but not confirmed"
+    - "candidates", "discoveries", "research candidates"
+    - "high AlphaMissense score", "top AlphaMissense"
+
     ## RESPONSE FORMAT:
 
     When generating visualizations:
@@ -408,11 +501,17 @@ query_agent = LlmAgent(
     - "Create a pie chart of variant significance"
     - "What's the distribution of variants by chromosome?"
     - "Show cardiovascular gene variants only"
+    - "Are there any novel variants with high AlphaMissense scores?"
+    - "Which variants are predicted pathogenic but not in ClinVar?"
+    - "Show me the top AlphaMissense discoveries"
+    - "Find high-priority research candidates"
 
     Format responses clearly:
     - Lead with a summary statement
     - Note the analysis mode (clinical vs research)
-    - List variants with their significance
+    - List variants with their significance AND evidence source
+    - Include AlphaMissense scores when available
+    - Flag concordance or discordance between ClinVar and AlphaMissense
     - Explain what the findings mean clinically
     - For visualizations, explain what the data represents
     - Use appropriate medical terminology while remaining accessible
@@ -420,9 +519,14 @@ query_agent = LlmAgent(
     IMPORTANT: 
     - Only work if annotations are complete (check state['annotations_artifact_name'])
     - For category filtering, only works in clinical mode
-    - Always specify chart_type when using generate_chart_data_tool""",
+    - Always specify chart_type when using generate_chart_data_tool
+    - When reporting AlphaMissense predictions, always include the numerical score
+    - Clearly distinguish between CONFIRMED (ClinVar) and PREDICTED (AlphaMissense) findings
+    - For novel variants (high AM score, no ClinVar), recommend validation studies
+    - Use novel_am_candidates_tool for cross-gene discovery queries about AlphaMissense predictions""",
     tools=[
         query_gene_tool,
+        novel_am_candidates_tool,
         generate_chart_tool,
         compare_populations_tool_instance,
         filter_category_tool
@@ -495,6 +599,7 @@ When user asks about specific genes, variants, or requests visualizations:
 - Check if annotations_artifact_name exists in state
 - If yes, delegate to QueryAgent for:
   * Specific gene lookups
+  * Novel AlphaMissense candidate discovery
   * Chart generation (bar, pie, histogram, heatmap, scatter)
   * Population frequency comparisons
   * Category filtering (clinical mode only)
@@ -509,6 +614,14 @@ Look for these patterns and delegate to QueryAgent:
 - "Compare frequencies across populations"
 - "Display distribution of..."
 - "What's the breakdown of..."
+
+### Recognizing Novel Candidate Requests:
+Look for these patterns and delegate to QueryAgent:
+- "Show me novel variants..."
+- "Find variants not in ClinVar..."
+- "What did AlphaMissense discover..."
+- "High-priority research candidates..."
+- "AI-predicted but not confirmed..."
 
 ## STATE TRACKING
 Key state variables to monitor:
@@ -526,6 +639,7 @@ Key state variables to monitor:
 - For status checks: Be clear about current phase and estimated remaining time
 - For completed analyses: Present the clinical report clearly with proper formatting
 - For specific queries: Use QueryAgent to look up individual genes of interest
+- For novel discoveries: Use QueryAgent to find AlphaMissense predictions not in ClinVar
 - For visualizations: QueryAgent can generate various chart types from the data
 - When appropriate, mention artifact storage locations from state
 

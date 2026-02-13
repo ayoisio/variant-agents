@@ -135,12 +135,14 @@ class VepRunnerService:
                     '--cache',
                     '--offline',
                     '--dir_cache', '/mnt/cache',  # Using the mounted persistent disk
+                    '--dir_plugins', '/opt/ensembl-vep/Plugins',
                     '--assembly', 'GRCh38',
                     '--format', 'vcf',
                     '--json',
                     '--symbol',
                     '--no_stats',
                     '--fork', str(fork_count),
+                    '--plugin', 'AlphaMissense,file=/app/data/AlphaMissense_hg38.tsv.gz',
                     '-o', 'STDOUT'
                 ]
 
@@ -179,6 +181,9 @@ class VepRunnerService:
                             gene = None
                             consequences = []
                             impact = None
+                            # AlphaMissense variables
+                            am_score = None
+                            am_class = None
 
                             # Extract annotations from transcript consequences
                             for tc in data.get('transcript_consequences', []):
@@ -189,6 +194,14 @@ class VepRunnerService:
                                 if tc.get('impact'):
                                     impact = tc.get('impact')
 
+                                # Extract AlphaMissense data from nested structure
+                                # The plugin wraps results as {"AlphaMissense": {"am_pathogenicity": ..., "am_class": ...}}
+                                am_data = tc.get('AlphaMissense', {})
+                                if am_score is None and am_data.get('am_pathogenicity') is not None:
+                                    am_score = float(am_data['am_pathogenicity'])
+                                if am_class is None and am_data.get('am_class'):
+                                    am_class = am_data['am_class']
+
                             # Update variant with VEP annotations
                             if gene:
                                 variant.info['GENE'] = gene
@@ -197,6 +210,12 @@ class VepRunnerService:
                                 variant.info['VEP_consequence'] = list(set(consequences))
                             if impact:
                                 variant.info['VEP_impact'] = impact
+
+                            # Store AlphaMissense data in variant info
+                            if am_score is not None:
+                                variant.info['AM_score'] = am_score
+                            if am_class:
+                                variant.info['AM_class'] = am_class
 
                     except json.JSONDecodeError as e:
                         task_logger.warning("Failed to parse VEP JSON line", line=line[:100], error=str(e))

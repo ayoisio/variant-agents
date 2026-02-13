@@ -36,7 +36,7 @@ class Variant(BaseModel):
 class VariantAnnotation(BaseModel):
     """Variant annotation from external sources."""
     variant_id: str
-    source: str = Field(..., description="Annotation source (ClinVar, gnomAD, etc)")
+    source: str = Field(..., description="Annotation source (ClinVar, gnomAD, AlphaMissense, etc)")
     clinical_significance: Optional[str] = None
     review_status: Optional[str] = None
     condition: Optional[List[str]] = None
@@ -49,6 +49,15 @@ class VariantAnnotation(BaseModel):
     acmg_classification: Optional[str] = None
     acmg_criteria: Optional[List[str]] = None
     annotation_date: datetime = Field(default_factory=datetime.now)
+    # AlphaMissense fields
+    am_pathogenicity: Optional[float] = Field(
+        None,
+        description="AlphaMissense pathogenicity score (0-1). >0.564 = likely pathogenic, <0.34 = likely benign"
+    )
+    am_class: Optional[str] = Field(
+        None,
+        description="AlphaMissense classification: likely_pathogenic, likely_benign, or ambiguous"
+    )
 
 
 def serialize_data_to_artifact(data: Any) -> Part:

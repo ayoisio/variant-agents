@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     wget \
     unzip \
+    tabix \
     # BioPerl dependencies
     libxml2-dev \
     libxslt1-dev \
@@ -51,6 +52,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p /app/data && \
     wget -O /app/data/clinvar.vcf.gz https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz && \
     wget -O /app/data/clinvar.vcf.gz.tbi https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz.tbi
+
+# Download and index AlphaMissense data
+RUN wget -O /app/data/AlphaMissense_hg38.tsv.gz \
+      https://storage.googleapis.com/dm_alphamissense/AlphaMissense_hg38.tsv.gz && \
+    tabix -s 1 -b 2 -e 2 -f -S 1 /app/data/AlphaMissense_hg38.tsv.gz
+
+# Download AlphaMissense VEP plugin
+RUN mkdir -p /opt/ensembl-vep/Plugins && \
+    wget -O /opt/ensembl-vep/Plugins/AlphaMissense.pm \
+      https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/115/AlphaMissense.pm
 
 # Copy the entire application code into the container
 COPY . .

@@ -214,31 +214,60 @@ class ReportGenerationService:
                 # ACMG classification for unannotated variants
                 task_logger.info("Performing ACMG classification for unannotated variants...")
                 acmg_classified_count = 0
+                am_classified_count = 0  # Track AM classifications
 
                 CHUNK_SIZE = 1000
                 for i in range(0, len(variants_to_annotate), CHUNK_SIZE):
                     chunk_end = min(i + CHUNK_SIZE, len(variants_to_annotate))
                     for j in range(i, chunk_end):
                         v = variants_to_annotate[j]
+
+                        # Get AlphaMissense data from variant info
+                        am_score = v.info.get('AM_score')
+                        am_class = v.info.get('AM_class')
+
                         if v.variant_id not in annotations:
                             freq = frequencies.get(v.variant_id)
-                            classification, criteria, rationale = acmg.classify_variant(v, None, freq)
 
-                            if classification in ["Pathogenic", "Likely pathogenic"]:
+                            # Check AlphaMissense FIRST for unannotated variants
+                            if am_class == 'likely_pathogenic' or (am_score and am_score > 0.564):
                                 annotations[v.variant_id] = VariantAnnotation(
                                     variant_id=v.variant_id,
-                                    source="ACMG_Classifier",
-                                    clinical_significance=classification,
-                                    acmg_criteria=criteria,
-                                    gene_symbol=v.info.get("GENE")
+                                    source="AlphaMissense",
+                                    clinical_significance="Likely Pathogenic (AI Predicted)",
+                                    gene_symbol=v.info.get("GENE"),
+                                    am_pathogenicity=am_score,
+                                    am_class=am_class
                                 )
-                                acmg_classified_count += 1
+                                am_classified_count += 1
+                            else:
+                                # Fall back to ACMG classifier
+                                classification, criteria, rationale = acmg.classify_variant(v, None, freq)
+
+                                if classification in ["Pathogenic", "Likely pathogenic"]:
+                                    annotations[v.variant_id] = VariantAnnotation(
+                                        variant_id=v.variant_id,
+                                        source="ACMG_Classifier",
+                                        clinical_significance=classification,
+                                        acmg_criteria=criteria,
+                                        gene_symbol=v.info.get("GENE"),
+                                        am_pathogenicity=am_score,
+                                        am_class=am_class
+                                    )
+                                    acmg_classified_count += 1
+                        else:
+                            # Add AM data to existing ClinVar annotations
+                            existing_ann = annotations[v.variant_id]
+                            if am_score is not None and existing_ann.am_pathogenicity is None:
+                                existing_ann.am_pathogenicity = am_score
+                                existing_ann.am_class = am_class
 
                     await asyncio.sleep(0)
                     if i % 10000 == 0 and i > 0:
                         await asyncio.sleep(0.01)
 
-                task_logger.info(f"ACMG classified {acmg_classified_count} additional pathogenic variants")
+                task_logger.info(f"ACMG classified {acmg_classified_count} pathogenic variants")
+                task_logger.info(f"AlphaMissense classified {am_classified_count} pathogenic variants")
 
             finally:
                 await clinvar.close()
@@ -571,75 +600,108 @@ class ReportGenerationService:
                                   all_interactions, all_actionable):
         """Generate prompt for clinical mode (ACMG secondary findings)."""
         return f"""You are a clinical geneticist reporting ACMG Secondary Findings (SF v3.3).
-        These are medically actionable incidental findings from clinical sequencing.
-
-        **ACMG SECONDARY FINDINGS ANALYSIS:**
-        - Total pathogenic/likely pathogenic variants in ACMG genes: {len(pathogenic_variants)}
-        - Unique ACMG genes with findings: {len(gene_frequency)}
-        - Genes with multiple variants (possible compound heterozygosity): {json.dumps(genes_with_multiple_variants, indent=2)}
-
-        **KEY PATTERNS:**
-        - Most common conditions: {json.dumps(condition_frequency.most_common(5), indent=2)}
-        - Genes requiring immediate action: {json.dumps([gene for gene, count in gene_frequency.items() if count > 1], indent=2)}
-
-        **BATCH ANALYSIS RESULTS:**
-        - Clinical findings: {len(all_findings)} total findings
-        - Sample findings: {json.dumps(all_findings[:10], indent=2)}
-        - Actionable items identified: {json.dumps(all_actionable[:10], indent=2)}
-
-        **YOUR TASK:**
-        Generate a clinical report focusing on:
-        1. IMMEDIATE medical actions needed for these secondary findings
-        2. Cascade testing recommendations for family members
-        3. Surveillance/screening protocols based on ACMG guidelines
-        4. Clear prioritization by clinical urgency
-        
-        Remember: These are SECONDARY findings - discovered incidentally but require action.
-
-        Return as JSON with three keys:
-        - "clinical_summary": Brief summary emphasizing actionable findings
-        - "actionable_recommendations": Specific, prioritized clinical actions
-        - "critical_key_findings": Most urgent findings requiring immediate attention"""
+    These are medically actionable incidental findings from clinical sequencing.
+    
+    **EVIDENCE HIERARCHY (in order of confidence):**
+    1. **ClinVar:** Expert-validated clinical assertions (Gold Standard)
+       - Pathogenic/Likely Pathogenic = confirmed clinical finding
+       - Always report the review status (e.g., "reviewed by expert panel")
+    
+    2. **AlphaMissense:** AI-predicted pathogenicity from Google DeepMind (Silver Standard)
+       - Score > 0.564: Likely Pathogenic
+       - Score < 0.34: Likely Benign  
+       - Score 0.34-0.564: Ambiguous (treat as VUS)
+       - 90% precision validated against ClinVar
+       - NOT trained on ClinVar, so predictions are independent
+    
+    3. **ACMG Classifier:** Rule-based computational classification (Bronze Standard)
+       - Based on population frequency and variant type rules
+       - Use when neither ClinVar nor AlphaMissense provides clear signal
+    
+    **INTERPRETATION GUIDELINES:**
+    - If ClinVar says Pathogenic → Report as CONFIRMED finding
+    - If NO ClinVar but AlphaMissense score > 0.9 → Flag as "High-Priority Novel Candidate"
+    - If AlphaMissense conflicts with ClinVar → Defer to ClinVar but NOTE the discordance
+    - Always clearly state the evidence SOURCE when reporting pathogenicity
+    - Include AlphaMissense score when discussing AI-predicted variants
+    
+    **ACMG SECONDARY FINDINGS ANALYSIS:**
+    - Total pathogenic/likely pathogenic variants in ACMG genes: {len(pathogenic_variants)}
+    - Unique ACMG genes with findings: {len(gene_frequency)}
+    - Genes with multiple variants (possible compound heterozygosity): {json.dumps(genes_with_multiple_variants, indent=2)}
+    
+    **KEY PATTERNS:**
+    - Most common conditions: {json.dumps(condition_frequency.most_common(5), indent=2)}
+    - Genes requiring immediate action: {json.dumps([gene for gene, count in gene_frequency.items() if count > 1], indent=2)}
+    
+    **BATCH ANALYSIS RESULTS:**
+    - Clinical findings: {len(all_findings)} total findings
+    - Sample findings: {json.dumps(all_findings[:10], indent=2)}
+    - Actionable items identified: {json.dumps(all_actionable[:10], indent=2)}
+    
+    **YOUR TASK:**
+    Generate a clinical report that:
+    1. Clearly distinguishes CONFIRMED (ClinVar) vs PREDICTED (AlphaMissense) findings
+    2. Prioritizes immediate medical actions for confirmed pathogenic findings
+    3. Flags high-confidence AlphaMissense predictions (score > 0.9) as research candidates
+    4. Recommends cascade testing for family members
+    5. Notes any discordance between ClinVar and AlphaMissense
+    
+    Return as JSON with three keys:
+    - "clinical_summary": Brief summary with evidence sources noted for each major finding
+    - "actionable_recommendations": Specific, prioritized clinical actions
+    - "critical_key_findings": Most urgent findings with their evidence source and confidence"""
 
     def _get_research_mode_prompt(self, pathogenic_variants, gene_frequency, condition_frequency,
                                   genes_with_multiple_variants, all_findings, all_genes,
                                   all_interactions, all_actionable):
         """Generate prompt for research mode (comprehensive analysis)."""
         return f"""You are performing comprehensive genomic analysis for research purposes.
-
-        **COMPREHENSIVE GENOME ANALYSIS:**
-        - Total pathogenic/likely pathogenic variants: {len(pathogenic_variants)}
-        - Total unique genes affected: {len(gene_frequency)}
-        - Total unique conditions: {len(condition_frequency)}
-
-        **CRITICAL PATTERN ANALYSIS:**
-        - Genes with multiple pathogenic variants: {json.dumps(genes_with_multiple_variants, indent=2)}
-        - Most frequent conditions (top 10): {json.dumps(condition_frequency.most_common(10), indent=2)}
-        - High-burden genes (>2 variants): {json.dumps([gene for gene, count in gene_frequency.items() if count > 2], indent=2)}
-
-        **POPULATION FREQUENCY INSIGHTS:**
-        Consider population-specific disease risks, carrier frequencies, and founder mutations.
-
-        **BATCH ANALYSIS SYNTHESIS:**
-        - Total findings: {len(all_findings)}
-        - Unique genes: {len(all_genes)}
-        - Variant interactions: {json.dumps(all_interactions[:10], indent=2)}
-        - Research insights: {json.dumps(all_actionable[:20], indent=2)}
-
-        **YOUR TASK:**
-        Provide a comprehensive research assessment including:
-        1. Overall genetic burden and disease risk profile
-        2. Gene pathway analysis and potential interactions
-        3. Research implications and areas for further investigation
-        4. Population health considerations
-        5. Novel or unexpected findings
-
-        Note: This is for RESEARCH - be comprehensive but indicate this is not for clinical use.
-
-        Return as JSON with three keys:
-        - "clinical_summary": Comprehensive overview of genomic findings
-        - "actionable_recommendations": Research priorities and suggested investigations
-        - "critical_key_findings": Most significant research discoveries"""
+    
+    **EVIDENCE SOURCES:**
+    1. **ClinVar:** Expert-validated clinical assertions
+    2. **AlphaMissense:** AI-predicted pathogenicity (Google DeepMind)
+       - Covers 89% of all 71 million possible human missense variants
+       - Score > 0.564 = likely pathogenic, < 0.34 = likely benign
+       - Enables analysis of novel variants not yet in clinical databases
+    3. **ACMG Classifier:** Rule-based classification for remaining variants
+    
+    **RESEARCH VALUE OF ALPHAMISSENSE:**
+    - Novel variants (not in ClinVar) with high AM scores = discovery opportunities
+    - Discordance between ClinVar and AlphaMissense may indicate evolving understanding
+    - AM scores enable prioritization for functional validation studies
+    - Population-specific variants can be assessed even without clinical reports
+    
+    **COMPREHENSIVE GENOME ANALYSIS:**
+    - Total pathogenic/likely pathogenic variants: {len(pathogenic_variants)}
+    - Total unique genes affected: {len(gene_frequency)}
+    - Total unique conditions: {len(condition_frequency)}
+    
+    **CRITICAL PATTERN ANALYSIS:**
+    - Genes with multiple pathogenic variants: {json.dumps(genes_with_multiple_variants, indent=2)}
+    - Most frequent conditions (top 10): {json.dumps(condition_frequency.most_common(10), indent=2)}
+    - High-burden genes (>2 variants): {json.dumps([gene for gene, count in gene_frequency.items() if count > 2], indent=2)}
+    
+    **BATCH ANALYSIS SYNTHESIS:**
+    - Total findings: {len(all_findings)}
+    - Unique genes: {len(all_genes)}
+    - Variant interactions: {json.dumps(all_interactions[:10], indent=2)}
+    - Research insights: {json.dumps(all_actionable[:20], indent=2)}
+    
+    **YOUR TASK:**
+    Provide a comprehensive research assessment including:
+    1. Novel high-confidence AlphaMissense predictions NOT in ClinVar (discovery candidates)
+    2. Overall genetic burden and disease risk profile
+    3. Gene pathway analysis and potential interactions
+    4. ClinVar vs AlphaMissense concordance analysis
+    5. Variants warranting functional validation studies
+    
+    Note: This is for RESEARCH purposes - be comprehensive but indicate this is not for clinical use.
+    
+    Return as JSON with three keys:
+    - "clinical_summary": Comprehensive overview with evidence source breakdown
+    - "actionable_recommendations": Research priorities and suggested investigations  
+    - "critical_key_findings": Most significant discoveries including novel AM predictions"""
 
     def _generate_fallback_assessment(self, pathogenic_variants: List[Dict[str, Any]],
                                       analysis_mode: str) -> Tuple[str, List[str], List[str]]:

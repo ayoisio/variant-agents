@@ -742,7 +742,10 @@ async def query_variant_by_gene(gene_name: str, tool_context: ToolContext,
                     "gene": ann.gene_symbol,
                     "clinical_significance": ann.clinical_significance,
                     "condition": ann.condition,
-                    "source": ann.source
+                    "source": ann.source,
+                    # Include AlphaMissense data
+                    "am_pathogenicity": ann.am_pathogenicity,
+                    "am_class": ann.am_class,
                 }
 
                 # Add frequency information based on detail level
@@ -916,6 +919,98 @@ async def query_variant_by_gene(gene_name: str, tool_context: ToolContext,
         }
 
 
+async def query_novel_alphamissense_candidates(
+    tool_context: ToolContext,
+    min_score: float = 0.564,
+    max_results: int = 50
+) -> Dict[str, Any]:
+    """
+    Find variants with high AlphaMissense scores that are NOT in ClinVar.
+    These represent novel pathogenic candidates for research validation.
+
+    Args:
+        tool_context: The tool context containing state and artifacts
+        min_score: Minimum AlphaMissense score threshold (default 0.564 = likely pathogenic)
+        max_results: Maximum number of variants to return
+
+    Returns:
+        Dictionary containing novel AlphaMissense candidates
+    """
+    tool_logger = logger.bind(tool="query_novel_alphamissense_candidates")
+    tool_logger.info(f"Searching for novel AM candidates with score >= {min_score}")
+
+    annotations_artifact_name = tool_context.state.get('annotations_artifact_name')
+    if not annotations_artifact_name:
+        return {
+            "status": "error",
+            "message": "No annotations available. Please complete the analysis first."
+        }
+
+    try:
+        # Load annotations
+        annotations_artifact = await tool_context.load_artifact(filename=annotations_artifact_name)
+        annotations_data = deserialize_data_from_artifact(annotations_artifact)
+        annotations = annotations_data.get('annotations', {})
+        analysis_mode = annotations_data.get('analysis_mode', 'unknown')
+
+        novel_candidates = []
+
+        for variant_id, ann in annotations.items():
+            # In report_generation_service, we set source="AlphaMissense" ONLY if
+            # it wasn't already in ClinVar. This is the perfect filter.
+            if ann.source == "AlphaMissense":
+                # Ensure we have a score and it meets the threshold
+                score = ann.am_pathogenicity
+                if score is not None and score >= min_score:
+                    novel_candidates.append({
+                        "variant_id": ann.variant_id,
+                        "gene": ann.gene_symbol,
+                        "am_pathogenicity": score,
+                        "am_class": ann.am_class,
+                        "clinical_significance": ann.clinical_significance,
+                        "source": ann.source,
+                        "condition": ann.condition
+                    })
+
+        # Sort by score descending (highest confidence first)
+        novel_candidates.sort(key=lambda x: x.get('am_pathogenicity', 0), reverse=True)
+
+        # Apply limit
+        total_found = len(novel_candidates)
+        truncated = False
+        if len(novel_candidates) > max_results:
+            novel_candidates = novel_candidates[:max_results]
+            truncated = True
+
+        tool_logger.info(f"Found {total_found} novel AM candidates, returning {len(novel_candidates)}")
+
+        response = {
+            "status": "success",
+            "total_novel_candidates": total_found,
+            "returned_count": len(novel_candidates),
+            "min_score_threshold": min_score,
+            "analysis_mode": analysis_mode,
+            "variants": novel_candidates,
+            "message": f"Found {total_found} novel AlphaMissense candidates (score >= {min_score}) not in ClinVar."
+        }
+
+        if truncated:
+            response["truncated"] = True
+            response["note"] = f"Results limited to top {max_results} by score. Use max_results parameter to see more."
+
+        if total_found == 0:
+            response["message"] = f"No novel AlphaMissense candidates found with score >= {min_score}. All pathogenic predictions may already be in ClinVar, or try lowering the min_score threshold."
+
+        return response
+
+    except Exception as e:
+        tool_logger.exception("Error querying novel candidates")
+        return {
+            "status": "error",
+            "message": f"Error: {str(e)}"
+        }
+
+
 # Tool instantiations with updated descriptions
 set_mode_tool = FunctionTool(func=set_analysis_mode)
 vcf_intake_tool = FunctionTool(func=load_and_parse_vcf)
@@ -924,6 +1019,7 @@ vep_status_tool = FunctionTool(func=check_vep_status)
 report_generation_tool = LongRunningFunctionTool(func=start_report_generation)
 report_status_tool = FunctionTool(func=check_report_status)
 query_gene_tool = FunctionTool(func=query_variant_by_gene)
+novel_am_candidates_tool = FunctionTool(func=query_novel_alphamissense_candidates)
 # DEPRECATED TOOLS (kept for backwards compatibility)
 knowledge_retrieval_tool = FunctionTool(func=retrieve_knowledge)
 clinical_assessment_tool = FunctionTool(func=perform_clinical_assessment)
