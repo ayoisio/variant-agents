@@ -347,7 +347,10 @@ class ReportGenerationService:
                         "gene": ann.gene_symbol,
                         "significance": ann.clinical_significance,
                         "condition": condition_text,
-                        "category": category_obj.value if category_obj else "Other"
+                        "category": category_obj.value if category_obj else "Other",
+                        "source": ann.source or "ClinVar",
+                        "am_pathogenicity": ann.am_pathogenicity,
+                        "am_class": ann.am_class,
                     })
 
             task_logger.info(
