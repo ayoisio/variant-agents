@@ -122,8 +122,8 @@ async def generate_chart_data_tool(
                 "message": f"Unable to generate {chart_type} chart for dimension {dimension}"
             }
 
-        # Apply filters if provided
-        if filters:
+        # Apply filters if provided (only for list-based chart data, not heatmaps/dicts)
+        if filters and isinstance(chart_data, list):
             chart_data = apply_filters_to_chart_data(chart_data, filters)
 
         # Add metadata
