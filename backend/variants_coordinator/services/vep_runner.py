@@ -113,6 +113,9 @@ class VepRunnerService:
             task_logger.info(
                 f"Starting VEP annotation for {total_variants} variants in {-(-total_variants // batch_size)} batches")
 
+            total_annotations = 0
+            total_am_scores = 0
+
             for i in range(0, total_variants, batch_size):
                 batch_end = min(i + batch_size, total_variants)
                 batch = variants[i:batch_end]
@@ -163,6 +166,7 @@ class VepRunnerService:
 
                 # Parse VEP JSON output
                 annotations_in_batch = 0
+                am_scores_in_batch = 0
                 for line in stdout.decode().split('\n'):
                     if not line.strip() or line.startswith('#'):
                         continue
@@ -214,6 +218,7 @@ class VepRunnerService:
                             # Store AlphaMissense data in variant info
                             if am_score is not None:
                                 variant.info['AM_score'] = am_score
+                                am_scores_in_batch += 1
                             if am_class:
                                 variant.info['AM_class'] = am_class
 
@@ -222,7 +227,30 @@ class VepRunnerService:
                         continue
 
                 task_logger.info(f"Completed VEP batch {batch_num}/{total_batches}",
-                                 annotations_added=annotations_in_batch)
+                                 annotations_added=annotations_in_batch,
+                                 am_scores_found=am_scores_in_batch)
+
+                total_annotations += annotations_in_batch
+                total_am_scores += am_scores_in_batch
+
+                # Update Firestore progress every 25 batches
+                if batch_num % 25 == 0 or batch_num == total_batches:
+                    progress_pct = round(batch_num / total_batches * 100, 1)
+                    try:
+                        await task_ref.update({
+                            "progress": {
+                                "current_batch": batch_num,
+                                "total_batches": total_batches,
+                                "progress_pct": progress_pct,
+                                "annotations_added": total_annotations,
+                                "am_scores_found": total_am_scores,
+                            },
+                            "updatedAt": firestore_v1.SERVER_TIMESTAMP
+                        })
+                    except Exception as progress_err:
+                        task_logger.warning("Failed to update Firestore progress",
+                                           error=str(progress_err),
+                                           batch_num=batch_num)
 
             task_logger.info("VEP annotation complete for all batches.")
 

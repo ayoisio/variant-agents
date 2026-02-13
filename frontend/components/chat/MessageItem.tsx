@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ChatMessage } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { 
-  Copy, 
+import { ProgressTracker } from '@/components/analysis/ProgressTracker';
+import {
+  Copy,
   Check,
   User,
   Terminal,
@@ -30,8 +31,8 @@ interface MessageItemProps {
   onViewVisualization?: (viz: DetectedVisualization) => void;
 }
 
-export function MessageItem({ 
-  message, 
+export function MessageItem({
+  message,
   isLast,
   onVisualizationDetected,
   onViewVisualization
@@ -41,6 +42,35 @@ export function MessageItem({
   const isUser = message.role === 'user';
   const [displayedContent, setDisplayedContent] = useState('');
   const [detectedVisualization, setDetectedVisualization] = useState<DetectedVisualization | null>(null);
+
+  // Detect VEP task ID from message content
+  // The LLM rephrases tool output freely, so we try multiple patterns
+  const vepTaskId = useMemo(() => {
+    if (isUser) return null;
+    const content = message.content;
+
+    // Pattern 1: Explicit task ID phrases (most common LLM phrasings)
+    const explicitPatterns = [
+      /task[_ ]id[\s:]+([a-f0-9-]{36})/i,          // task_id: X, task ID: X, task id X
+      /task ID is ([a-f0-9-]{36})/i,                // task ID is X
+      /(?:tracking|task)\s+ID[:\s]+([a-f0-9-]{36})/i, // tracking ID: X
+      /with (?:ID|id)\s+([a-f0-9-]{36})/i,         // with ID X
+      /`([a-f0-9-]{36})`/,                          // `uuid` in backticks
+    ];
+
+    for (const pattern of explicitPatterns) {
+      const match = content.match(pattern);
+      if (match) return match[1];
+    }
+
+    // Pattern 2: Any UUID in a message mentioning VEP or annotation
+    if (/\b(?:vep|annotation|dispatched|background processing)\b/i.test(content)) {
+      const uuidMatch = content.match(/\b([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\b/);
+      if (uuidMatch) return uuidMatch[1];
+    }
+
+    return null;
+  }, [message.content, isUser]);
 
   useEffect(() => {
     if (message.isStreaming && isLast) {
@@ -58,13 +88,13 @@ export function MessageItem({
         console.log('MessageItem found visualization in metadata:', message.metadata.visualization);
         setDetectedVisualization(message.metadata.visualization);
         onVisualizationDetected?.(message.metadata.visualization);
-      } 
+      }
       // Also try detecting from event structure
       else if (message.metadata.event) {
-        const viz = ChartDetector.detectInSSEEvent({ 
-          event: message.metadata.event 
+        const viz = ChartDetector.detectInSSEEvent({
+          event: message.metadata.event
         });
-        
+
         if (viz) {
           console.log('MessageItem detected viz from event:', viz);
           setDetectedVisualization(viz);
@@ -165,9 +195,8 @@ export function MessageItem({
         </div>
 
         {/* Message Card */}
-        <Card className={`border ${
-          isUser ? 'bg-gray-950 border-gray-800' : 'bg-black border-gray-900'
-        }`}>
+        <Card className={`border ${isUser ? 'bg-gray-950 border-gray-800' : 'bg-black border-gray-900'
+          }`}>
           <div className="p-3">
             {/* VCF Path Display */}
             {message.content.includes('gs://') && (
@@ -189,7 +218,7 @@ export function MessageItem({
                     code({ node, className, children, ...props }: any) {
                       const match = /language-(\w+)/.exec(className || '');
                       const inline = !match;
-                      
+
                       return !inline ? (
                         <SyntaxHighlighter
                           style={oneDark as any}
@@ -216,9 +245,13 @@ export function MessageItem({
               )}
             </div>
 
-            {/* Streaming Indicator */}
             {message.isStreaming && (
               <span className="inline-block w-2 h-4 bg-green-500 animate-pulse" />
+            )}
+
+            {/* VEP Progress Tracker */}
+            {vepTaskId && (
+              <ProgressTracker taskId={vepTaskId} />
             )}
 
             {/* Visualization Indicator (Terminal Style) */}

@@ -1,65 +1,34 @@
 // components/analysis/ProgressTracker.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { 
+import {
   Cpu,
-  Activity,
   Clock,
   AlertTriangle,
   CheckCircle,
-  Hash,
-  Loader2
+  Loader2,
+  Terminal,
+  Dna
 } from 'lucide-react';
+import { useTaskProgress } from '@/hooks/useTaskProgress';
 
 interface ProgressTrackerProps {
   taskId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress?: number;
-  startTime?: Date;
-  estimatedDuration?: number;
-  variantCount?: number;
-  message?: string;
-  error?: string;
 }
 
-export function ProgressTracker({
-  taskId,
-  status,
-  progress = 0,
-  startTime,
-  estimatedDuration = 300,
-  variantCount,
-  message,
-  error
-}: ProgressTrackerProps) {
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [cpuLoad, setCpuLoad] = useState(0);
-  const [memoryUsage, setMemoryUsage] = useState(0);
+export function ProgressTracker({ taskId }: ProgressTrackerProps) {
+  const { status, progress, logs, error } = useTaskProgress(taskId);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
-    if (status === 'running' && startTime) {
-      const interval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
-        setElapsedTime(elapsed);
-        
-        // Simulate CPU/memory metrics
-        setCpuLoad(60 + Math.random() * 30);
-        setMemoryUsage(40 + Math.random() * 20);
-      }, 1000);
-      
-      return () => clearInterval(interval);
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [status, startTime]);
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, [logs]);
 
   const getStatusIcon = () => {
     switch (status) {
@@ -71,6 +40,8 @@ export function ProgressTracker({
         return <CheckCircle className="h-3 w-3 text-green-500" />;
       case 'failed':
         return <AlertTriangle className="h-3 w-3 text-red-500" />;
+      default:
+        return <Clock className="h-3 w-3 text-gray-500" />;
     }
   };
 
@@ -84,8 +55,20 @@ export function ProgressTracker({
     }
   };
 
+  const getLogColor = (type: string) => {
+    switch (type) {
+      case 'progress': return 'text-green-400';
+      case 'am': return 'text-cyan-400';
+      case 'complete': return 'text-green-300 font-semibold';
+      case 'error': return 'text-red-400';
+      default: return 'text-gray-500';
+    }
+  };
+
+  const progressPct = progress?.progress_pct ?? 0;
+
   return (
-    <Card className="bg-black border-green-900/50">
+    <Card className="bg-black border-green-900/50 my-2">
       <CardContent className="p-4">
         <div className="space-y-3">
           {/* Header */}
@@ -99,7 +82,7 @@ export function ProgressTracker({
             <div className="flex items-center gap-2">
               {getStatusIcon()}
               <span className={`font-mono text-xs ${getStatusColor()}`}>
-                {status.toUpperCase()}
+                {(status ?? 'loading').toUpperCase()}
               </span>
             </div>
           </div>
@@ -107,79 +90,62 @@ export function ProgressTracker({
           {/* Task Info */}
           <div className="font-mono text-xs text-gray-600 space-y-1">
             <div>TASK_ID: {taskId.slice(0, 12)}...</div>
-            {variantCount && (
-              <div>VARIANTS: {variantCount.toLocaleString()}</div>
-            )}
-            {status === 'running' && (
-              <div>ELAPSED: {formatTime(elapsedTime)}</div>
+            {progress && (
+              <div className="flex items-center gap-4">
+                <span>BATCH: {progress.current_batch}/{progress.total_batches}</span>
+                {progress.am_scores_found > 0 && (
+                  <span className="flex items-center gap-1 text-cyan-500">
+                    <Dna className="h-3 w-3" />
+                    AM: {progress.am_scores_found}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
           {/* Progress Bar */}
-          {status === 'running' && (
+          {(status === 'running' || status === 'pending') && (
             <div className="space-y-2">
               <div className="flex justify-between font-mono text-xs">
                 <span className="text-gray-600">PROGRESS</span>
-                <span className="text-green-500">{progress.toFixed(0)}%</span>
+                <span className="text-green-500">{progressPct.toFixed(1)}%</span>
               </div>
-              <Progress 
-                value={progress} 
+              <Progress
+                value={progressPct}
                 className="h-1 bg-gray-900"
               />
             </div>
           )}
 
-          {/* System Metrics */}
-          {status === 'running' && (
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-900">
-              <div className="space-y-1">
-                <div className="flex justify-between font-mono text-xs">
-                  <span className="text-gray-600">CPU</span>
-                  <span className={cpuLoad > 80 ? 'text-yellow-500' : 'text-green-500'}>
-                    {cpuLoad.toFixed(0)}%
-                  </span>
-                </div>
-                <Progress 
-                  value={cpuLoad} 
-                  className="h-1 bg-gray-900"
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <div className="flex justify-between font-mono text-xs">
-                  <span className="text-gray-600">MEM</span>
-                  <span className="text-green-500">
-                    {memoryUsage.toFixed(0)}%
-                  </span>
-                </div>
-                <Progress 
-                  value={memoryUsage} 
-                  className="h-1 bg-gray-900"
-                />
-              </div>
+          {/* Terminal Log View */}
+          <div className="pt-2 border-t border-gray-900">
+            <div className="flex items-center gap-1 mb-2">
+              <Terminal className="h-3 w-3 text-gray-600" />
+              <span className="font-mono text-xs text-gray-600">LOG OUTPUT</span>
             </div>
-          )}
-
-          {/* Status Message */}
-          {message && (
-            <div className="font-mono text-xs text-gray-500 pt-2 border-t border-gray-900">
-              {status === 'running' && '> '}{message}
+            <div
+              ref={logContainerRef}
+              className="bg-gray-950 rounded p-2 max-h-36 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800"
+            >
+              {logs.length === 0 ? (
+                <div className="font-mono text-xs text-gray-700 animate-pulse">
+                  Waiting for task data...
+                </div>
+              ) : (
+                logs.map((log, i) => (
+                  <div key={i} className={`font-mono text-xs ${getLogColor(log.type)} leading-5`}>
+                    <span className="text-gray-700">[{log.timestamp}]</span>{' '}
+                    {log.type === 'am' ? '🧬 ' : ''}{log.message}
+                  </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
             <div className="font-mono text-xs text-red-500 pt-2 border-t border-gray-900">
               ERROR: {error}
-            </div>
-          )}
-
-          {/* Log Output */}
-          {status === 'running' && (
-            <div className="font-mono text-xs text-gray-700 space-y-1 pt-2 border-t border-gray-900">
-              <div>[VEP] Loading cache...</div>
-              <div>[VEP] Processing batch {Math.floor(progress / 10) + 1}/10</div>
-              <div className="animate-pulse">[VEP] Annotating variants...</div>
             </div>
           )}
         </div>

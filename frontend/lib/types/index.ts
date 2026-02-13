@@ -155,6 +155,17 @@ export interface VEPProgress {
 }
 
 /**
+ * Real-time task progress from Firestore background_tasks collection
+ */
+export interface TaskProgress {
+  current_batch: number;
+  total_batches: number;
+  progress_pct: number;
+  annotations_added: number;
+  am_scores_found: number;
+}
+
+/**
  * Enhanced SSE metadata from backend
  */
 export interface SSEMetadata {
