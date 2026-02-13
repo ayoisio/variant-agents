@@ -198,24 +198,15 @@ class VepRunnerService:
                                 if tc.get('impact'):
                                     impact = tc.get('impact')
 
-                                # DEBUG: Log TC keys once to diagnose AM field names
-                                if annotations_in_batch == 0 and am_scores_in_batch == 0:
-                                    am_keys = [k for k in tc.keys() if 'am' in k.lower() or 'alpha' in k.lower() or 'missense' in k.lower()]
-                                    if am_keys:
-                                        task_logger.info("DEBUG AM fields found in TC", am_keys=am_keys,
-                                                        sample_values={k: tc[k] for k in am_keys})
-                                    elif batch_num <= 2:
-                                        task_logger.debug("DEBUG TC keys (no AM found)", keys=list(tc.keys())[:20])
-
-                                # Extract AlphaMissense data - check multiple possible structures
-                                # Structure 1: Nested {"AlphaMissense": {"am_pathogenicity": ..., "am_class": ...}}
-                                am_data = tc.get('AlphaMissense', {})
+                                # Extract AlphaMissense data from nested structure
+                                # VEP outputs lowercase key: {"alphamissense": {"am_pathogenicity": ..., "am_class": ...}}
+                                am_data = tc.get('alphamissense', {})
                                 if am_score is None and am_data.get('am_pathogenicity') is not None:
                                     am_score = float(am_data['am_pathogenicity'])
                                 if am_class is None and am_data.get('am_class'):
                                     am_class = am_data['am_class']
 
-                                # Structure 2: Flat fields directly on the transcript consequence
+                                # Fallback: flat fields directly on the transcript consequence
                                 if am_score is None and tc.get('am_pathogenicity') is not None:
                                     am_score = float(tc['am_pathogenicity'])
                                 if am_class is None and tc.get('am_class'):
