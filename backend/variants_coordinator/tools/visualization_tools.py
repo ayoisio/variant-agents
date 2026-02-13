@@ -103,6 +103,8 @@ async def generate_chart_data_tool(
                 chart_data = chart_service.get_gene_distribution(limit=limit or 20)
             elif dimension == "impact":
                 chart_data = chart_service.get_impact_distribution()
+            elif dimension in ("frequency", "top_variants"):
+                chart_data = chart_service.get_top_variants_by_frequency(limit=limit or 20)
             elif dimension == "category" and analysis_mode == "clinical":
                 chart_data = chart_service.get_acmg_category_distribution()
             else:

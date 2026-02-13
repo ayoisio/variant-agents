@@ -268,6 +268,52 @@ class ChartDataService:
 
         return chart_data
 
+    def get_top_variants_by_frequency(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get the most frequent variants ranked by global allele frequency.
+
+        Args:
+            limit: Maximum number of variants to return
+
+        Returns:
+            List of variant data sorted by frequency (descending)
+        """
+        variant_freq_list = []
+
+        for variant_id, freq_data in self.frequencies.items():
+            if variant_id not in self.annotations:
+                continue
+
+            af = freq_data.get("af", 0)
+            if af <= 0:
+                continue
+
+            annotation = self.annotations[variant_id]
+            gene = annotation.gene_symbol or "Unknown"
+            significance = annotation.clinical_significance or "Unknown"
+
+            # Format display label
+            if af >= 0.01:
+                af_label = f"{af:.2%}"
+            elif af >= 0.0001:
+                af_label = f"{af:.4%}"
+            else:
+                af_label = f"{af:.2e}"
+
+            variant_freq_list.append({
+                "name": f"{gene} ({variant_id})",
+                "value": af,
+                "gene": gene,
+                "variant_id": variant_id,
+                "significance": significance,
+                "label": af_label,
+                "category": "frequency"
+            })
+
+        # Sort by frequency descending and take top N
+        variant_freq_list.sort(key=lambda x: x["value"], reverse=True)
+        return variant_freq_list[:limit]
+
     def get_frequency_histogram(self, bins: int = 10) -> List[Dict[str, Any]]:
         """
         Get frequency distribution histogram.

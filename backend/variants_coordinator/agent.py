@@ -432,11 +432,18 @@ query_agent = LlmAgent(
     When users request visualizations or charts, use the appropriate tool:
 
     ### Chart Generation (generate_chart_data_tool):
-    - **Bar charts**: Gene distribution, chromosome distribution, impact levels
+    - **Bar charts**: Gene distribution, chromosome distribution, impact levels, **top variants by frequency**
     - **Pie charts**: Clinical significance distribution, ACMG categories
     - **Histograms**: Allele frequency distribution
     - **Heatmaps**: Population frequency patterns
     - **Scatter plots**: Frequency vs significance correlations
+
+    **Available bar chart dimensions:**
+    - dimension="gene" → Top genes with most variants
+    - dimension="chromosome" → Variant distribution by chromosome
+    - dimension="impact" → Distribution by impact level (HIGH, MODERATE, etc.)
+    - dimension="frequency" → **Top variants ranked by allele frequency** (most common variants)
+    - dimension="category" → ACMG categories (clinical mode only)
 
     Examples of visualization requests you can handle:
     - "Show me a bar chart of variant distribution by chromosome"
@@ -444,6 +451,9 @@ query_agent = LlmAgent(
     - "Display the top 20 genes with most variants"
     - "Show frequency distribution as a histogram"
     - "Generate a heatmap of population frequencies"
+    - "**What are the most frequent variants?**" → use dimension="frequency"
+    - "**Show me the top 10 variants by allele frequency**" → use dimension="frequency", limit=10
+    - "**Which variants have the highest population frequency?**" → use dimension="frequency"
 
     ### Population Comparisons (compare_populations_tool):
     - Compare frequencies across different populations
@@ -471,6 +481,7 @@ query_agent = LlmAgent(
     - **Actions**: "show", "display", "visualize", "plot", "graph"
     - **Comparisons**: "compare", "versus", "vs", "across populations"
     - **Distributions**: "distribution", "breakdown", "spread"
+    - **Frequency queries**: "most frequent", "highest frequency", "most common", "top variants" → use generate_chart_data_tool with chart_type="bar", dimension="frequency"
 
     ## RECOGNIZING NOVEL CANDIDATE REQUESTS:
 
