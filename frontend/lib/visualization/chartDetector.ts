@@ -29,25 +29,25 @@ export class ChartDetector {
     try {
       // Check if event contains tool function response
       if (event?.event) {
-        const parsedEvent = typeof event.event === 'string' 
-          ? JSON.parse(event.event) 
+        const parsedEvent = typeof event.event === 'string'
+          ? JSON.parse(event.event)
           : event.event;
-        
+
         // Check for visualization tool responses
         if (parsedEvent?.content?.parts) {
           for (const part of parsedEvent.content.parts) {
             // Look for function responses from visualization tools
-            if (part.function_response?.name?.includes('chart') || 
-                part.function_response?.name?.includes('visualization') ||
-                part.function_response?.name === 'generate_chart_data_tool' ||
-                part.function_response?.name === 'compare_populations_tool' ||
-                part.function_response?.name === 'filter_by_category_tool') {
-              
+            if (part.function_response?.name?.includes('chart') ||
+              part.function_response?.name?.includes('visualization') ||
+              part.function_response?.name === 'generate_chart_data_tool' ||
+              part.function_response?.name === 'compare_populations_tool' ||
+              part.function_response?.name === 'filter_by_category_tool') {
+
               const response = part.function_response.response;
-              const parsedResponse = typeof response === 'string' 
-                ? JSON.parse(response) 
+              const parsedResponse = typeof response === 'string'
+                ? JSON.parse(response)
                 : response;
-              
+
               if (parsedResponse?.status === 'success' && parsedResponse?.data) {
                 return this.parseVisualizationResponse(parsedResponse, part.function_response.name);
               }
@@ -78,7 +78,7 @@ export class ChartDetector {
     filters?: any;
   } {
     const lowerText = text.toLowerCase();
-    
+
     // Chart type patterns
     const chartPatterns = {
       bar: /\b(bar\s*chart|bar\s*graph|histogram)\b/i,
@@ -132,21 +132,82 @@ export class ChartDetector {
    * Parse visualization response from tool
    */
   private static parseVisualizationResponse(
-    response: any, 
+    response: any,
     toolName: string
   ): DetectedVisualization {
     const id = `viz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Determine chart type
-    let chartType = response.chart_type || 'bar';
+
+    // Population name mapping for display
+    const populationNames: Record<string, string> = {
+      AFR: 'African/African American',
+      AMR: 'Latino/Admixed American',
+      ASJ: 'Ashkenazi Jewish',
+      EAS: 'East Asian',
+      FIN: 'Finnish',
+      NFE: 'Non-Finnish European',
+      SAS: 'South Asian',
+      OTH: 'Other',
+    };
+
+    let chartType: string;
+    let chartData: any;
+    let title = response.title;
+
     if (toolName === 'compare_populations_tool') {
+      const variants = response.data || [];
+      const geneName = response.gene || variants[0]?.gene || 'Unknown';
+
+      if (variants.length <= 3) {
+        // Single/few variants → bar chart (one bar per population)
+        chartType = 'bar';
+        title = title || `${geneName} Population Frequency Analysis`;
+
+        // Build bar data from the first variant's population frequencies
+        const variant = variants[0];
+        if (variant?.populations) {
+          chartData = Object.entries(variant.populations).map(([pop, freq]) => ({
+            name: populationNames[pop] || pop,
+            shortName: pop,
+            value: freq as number,
+            label: (freq as number) > 0
+              ? `${((freq as number) * 100).toFixed(5)}%`
+              : 'NOT_DETECTED',
+            variant_id: variant.variant_id,
+            significance: variant.significance,
+            global_af: variant.global_af,
+          }));
+        } else {
+          chartData = [];
+        }
+      } else {
+        // Multiple variants → heatmap matrix
+        chartType = 'heatmap';
+        title = title || `${geneName} Population Frequency Heatmap`;
+
+        const populations = response.populations || Object.keys(variants[0]?.populations || {});
+        const rows = variants.map((v: any) => `${v.gene || ''} (${v.variant_id})`);
+        const columns = populations.map((p: string) => populationNames[p] || p);
+        const values = variants.map((v: any) =>
+          populations.map((pop: string) => {
+            const freq = v.populations?.[pop] || 0;
+            return freq > 0 ? -Math.log10(freq) : 6; // log scale, cap at 1e-6
+          })
+        );
+
+        chartData = { rows, columns, values };
+      }
+    } else if (response.chart_type === 'heatmap' || response.data?.rows) {
+      // Already in heatmap format from generate_chart_data_tool
       chartType = 'heatmap';
-    } else if (response.comparison_type === 'population_frequencies') {
-      chartType = 'bar';
+      chartData = response.data;
+      title = title || 'Population Frequency Heatmap';
+    } else {
+      // Standard chart data (bar, pie, histogram, scatter)
+      chartType = response.chart_type || 'bar';
+      chartData = response.data || response;
     }
 
-    // Extract title
-    let title = response.title;
+    // Fallback title
     if (!title) {
       if (response.dimension) {
         title = `${this.formatDimension(response.dimension)} Distribution`;
@@ -163,12 +224,12 @@ export class ChartDetector {
       id,
       type: chartType as any,
       title,
-      data: response.data || response,
+      data: chartData,
       dimension: response.dimension,
       metadata: response.metadata || {
         analysisMode: response.analysis_mode,
         totalAnnotations: response.total_annotations,
-        dataPoints: response.data?.length,
+        dataPoints: Array.isArray(chartData) ? chartData.length : response.data?.length,
         context: response.context,
         filters: response.filters
       },
@@ -216,20 +277,20 @@ export class ChartDetector {
       const items = data.data || data;
       if (items.length > 0) {
         const first = items[0];
-        
+
         // If data points have frequency ranges, it's likely a histogram
         if (first.range_start !== undefined || first.range_end !== undefined) {
           return 'histogram';
         }
-        
+
         // If we have a small number of items with percentages, likely a pie chart
         if (items.length <= 8 && first.percentage !== undefined) {
           return 'pie';
         }
-        
+
         // Check for significance data (often shown as pie)
-        if (first.name?.toLowerCase().includes('pathogenic') || 
-            first.name?.toLowerCase().includes('benign')) {
+        if (first.name?.toLowerCase().includes('pathogenic') ||
+          first.name?.toLowerCase().includes('benign')) {
           return 'pie';
         }
       }
@@ -260,14 +321,14 @@ export class ChartDetector {
    */
   static extractVisualizationsFromMessages(messages: SSEMessage[]): DetectedVisualization[] {
     const visualizations: DetectedVisualization[] = [];
-    
+
     for (const message of messages) {
       // Check if the message contains visualization data in its event
       const viz = this.detectInSSEEvent(message);
       if (viz) {
         visualizations.push(viz);
       }
-      
+
       // Also check the raw event if different from the wrapped message
       if (message.event) {
         const eventViz = this.detectInSSEEvent({ event: message.event });
@@ -276,7 +337,7 @@ export class ChartDetector {
         }
       }
     }
-    
+
     return visualizations;
   }
 
@@ -285,12 +346,12 @@ export class ChartDetector {
    */
   static isPopulationComparison(data: any): boolean {
     if (!data) return false;
-    
+
     // Check for population comparison structure
     if (data.comparison_type === 'population_frequencies') {
       return true;
     }
-    
+
     // Check for population data in array items
     if (Array.isArray(data.data || data)) {
       const items = data.data || data;
@@ -298,7 +359,7 @@ export class ChartDetector {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -307,25 +368,25 @@ export class ChartDetector {
    */
   static validateVisualizationData(viz: DetectedVisualization): boolean {
     if (!viz.data) return false;
-    
+
     // Check for valid data structure based on type
     switch (viz.type) {
       case 'heatmap':
         return !!(viz.data.rows && viz.data.columns && viz.data.values);
-      
+
       case 'scatter':
         const scatterData = viz.data.data || viz.data;
-        return Array.isArray(scatterData) && 
-               scatterData.length > 0 && 
-               scatterData[0].x !== undefined;
-      
+        return Array.isArray(scatterData) &&
+          scatterData.length > 0 &&
+          scatterData[0].x !== undefined;
+
       case 'bar':
       case 'pie':
       case 'histogram':
       case 'line':
         const chartData = viz.data.data || viz.data;
         return Array.isArray(chartData) && chartData.length > 0;
-      
+
       default:
         return false;
     }

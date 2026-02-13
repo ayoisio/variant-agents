@@ -63,18 +63,18 @@ export function DynamicChart({
   // Detect chart type from data structure or explicit type
   const detectedType = useMemo(() => {
     if (chartType) return chartType.toLowerCase();
-    
+
     // Check if data is ChartData type
     if (!Array.isArray(data) && data && typeof data === 'object') {
       // Heatmap detection
       if (data.rows && data.columns && data.values) {
         return 'heatmap';
       }
-      
+
       // Check for explicit type in data
       if (data.type) return data.type.toLowerCase();
     }
-    
+
     // Scatter plot detection
     if (normalizedData.length > 0) {
       const firstItem = normalizedData[0];
@@ -82,7 +82,7 @@ export function DynamicChart({
         return 'scatter';
       }
     }
-    
+
     // Default to bar chart
     return 'bar';
   }, [data, chartType, normalizedData]);
@@ -109,10 +109,15 @@ export function DynamicChart({
                 ? entry.value.toExponential(2)
                 : entry.value?.toLocaleString()}
             </span>
-            {entry.payload.pathogenic !== undefined && (
+            {entry.payload?.significance && (
               <div className="text-xs text-muted-foreground mt-1">
-                Pathogenic: {entry.payload.pathogenic}, 
-                Benign: {entry.payload.benign}, 
+                Significance: {entry.payload.significance}
+              </div>
+            )}
+            {entry.payload?.pathogenic !== undefined && (
+              <div className="text-xs text-muted-foreground mt-1">
+                Pathogenic: {entry.payload.pathogenic},
+                Benign: {entry.payload.benign},
                 VUS: {entry.payload.vus}
               </div>
             )}
@@ -122,32 +127,131 @@ export function DynamicChart({
     );
   };
 
-  // Render bar chart
-  const renderBarChart = () => {
+  // Check if this is population frequency data (from compare_populations_tool)
+  const isPopulationData = useMemo(() => {
+    return normalizedData.length > 0 && normalizedData[0]?.shortName !== undefined;
+  }, [normalizedData]);
+
+  // Render population frequency bar chart (horizontal, with NOT_DETECTED labels)
+  const renderPopulationBarChart = () => {
     if (!normalizedData || normalizedData.length === 0) {
       return <div>No data available</div>;
     }
-    
+
+    // Sort by value descending so highest frequency is at top
+    const sorted = [...normalizedData].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const maxValue = Math.max(...sorted.map((d: any) => d.value || 0));
+    const globalAF = sorted[0]?.global_af;
+    const significance = sorted[0]?.significance;
+    const variantId = sorted[0]?.variant_id;
+
+    return (
+      <div className="w-full space-y-3">
+        {/* Header info */}
+        {(variantId || significance) && (
+          <div className="flex items-center justify-between px-1">
+            <div className="font-mono text-xs">
+              {variantId && (
+                <span className="text-cyan-400">VARIANT: <span className="text-white">{variantId}</span></span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {significance && (
+                <Badge variant="outline" className="text-xs border-red-800 text-red-400">
+                  {significance}
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+        {globalAF !== undefined && globalAF !== null && (
+          <div className="font-mono text-xs text-gray-500 px-1">
+            GLOBAL_AF: <span className="text-gray-300">{formatPercent(globalAF)}</span>
+          </div>
+        )}
+
+        {/* Horizontal bars */}
+        <div className="space-y-2">
+          {sorted.map((entry: any, index: number) => {
+            const isDetected = entry.value > 0;
+            const barWidth = isDetected && maxValue > 0
+              ? Math.max((entry.value / maxValue) * 100, 2)
+              : 0;
+
+            return (
+              <div key={entry.shortName || index} className="flex items-center gap-3">
+                {/* Population label */}
+                <div className="w-36 flex-shrink-0">
+                  <div className="font-mono text-xs text-gray-300 truncate">{entry.name}</div>
+                  <div className="font-mono text-[10px] text-gray-600">{entry.shortName}</div>
+                </div>
+
+                {/* Bar */}
+                <div className="flex-1 relative">
+                  <div className="h-7 bg-gray-900 rounded overflow-hidden border border-gray-800">
+                    {isDetected ? (
+                      <div
+                        className="h-full rounded transition-all duration-500"
+                        style={{
+                          width: `${barWidth}%`,
+                          background: `linear-gradient(90deg, #0d9488 0%, #3b82f6 100%)`,
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full flex items-center justify-center">
+                        <span className="font-mono text-[10px] text-gray-600">NOT_DETECTED</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Value label */}
+                <div className="w-20 text-right font-mono text-xs flex-shrink-0">
+                  {isDetected ? (
+                    <span className="text-gray-300">{formatPercent(entry.value)}</span>
+                  ) : (
+                    <span className="text-gray-700">0%</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Render standard vertical bar chart
+  const renderBarChart = () => {
+    // Use population chart if data has population fields
+    if (isPopulationData) {
+      return renderPopulationBarChart();
+    }
+
+    if (!normalizedData || normalizedData.length === 0) {
+      return <div>No data available</div>;
+    }
+
     return (
       <ResponsiveContainer width={width} height={height}>
         <BarChart data={normalizedData} margin={{ top: 20, right: 30, left: 40, bottom: 60 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis 
-            dataKey="name" 
+          <XAxis
+            dataKey="name"
             angle={-45}
             textAnchor="end"
             height={100}
             tick={{ fontSize: 11 }}
             className="text-muted-foreground"
           />
-          <YAxis 
+          <YAxis
             tick={{ fontSize: 11 }}
             className="text-muted-foreground"
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ paddingTop: '20px' }} />
-          <Bar 
-            dataKey="value" 
+          <Bar
+            dataKey="value"
             fill={colors[0]}
             radius={[4, 4, 0, 0]}
           >
@@ -165,23 +269,23 @@ export function DynamicChart({
     if (!normalizedData || normalizedData.length === 0) {
       return <div>No data available</div>;
     }
-    
+
     const RADIAN = Math.PI / 180;
     const renderCustomizedLabel = ({
       cx, cy, midAngle, innerRadius, outerRadius, percent, index, name
     }: any) => {
       if (percent < 0.05) return null; // Don't show labels for small slices
-      
+
       const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
       const x = cx + radius * Math.cos(-midAngle * RADIAN);
       const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
       return (
-        <text 
-          x={x} 
-          y={y} 
-          fill="white" 
-          textAnchor={x > cx ? 'start' : 'end'} 
+        <text
+          x={x}
+          y={y}
+          fill="white"
+          textAnchor={x > cx ? 'start' : 'end'}
           dominantBaseline="central"
           className="text-xs font-semibold"
         >
@@ -219,20 +323,20 @@ export function DynamicChart({
     if (!normalizedData || normalizedData.length === 0) {
       return <div>No data available</div>;
     }
-    
+
     return (
       <ResponsiveContainer width={width} height={height}>
         <ScatterChart margin={{ top: 20, right: 30, left: 40, bottom: 40 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis 
-            dataKey="x" 
-            name="Frequency (log10)" 
+          <XAxis
+            dataKey="x"
+            name="Frequency (log10)"
             tick={{ fontSize: 11 }}
             className="text-muted-foreground"
           />
-          <YAxis 
-            dataKey="y" 
-            name="Clinical Significance" 
+          <YAxis
+            dataKey="y"
+            name="Clinical Significance"
             tick={{ fontSize: 11 }}
             className="text-muted-foreground"
             domain={[0, 4]}
@@ -243,15 +347,15 @@ export function DynamicChart({
             }}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Scatter 
-            name="Variants" 
-            data={normalizedData} 
+          <Scatter
+            name="Variants"
+            data={normalizedData}
             fill={colors[0]}
           >
             {normalizedData.map((entry: any, index: number) => (
-              <Cell 
-                key={`cell-${index}`} 
-                fill={entry.significance?.includes('pathogenic') ? colors[3] : colors[0]} 
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.significance?.includes('pathogenic') ? colors[3] : colors[0]}
               />
             ))}
           </Scatter>
@@ -262,28 +366,43 @@ export function DynamicChart({
 
   // Render heatmap
   const renderHeatmap = () => {
-    // Type guard to ensure we have the heatmap data structure
-    if (!data || Array.isArray(data)) {
-      return <div>Invalid heatmap data</div>;
-    }
-    
-    const { rows, columns, values } = data as { 
-      rows?: string[]; 
-      columns?: string[]; 
-      values?: number[][] 
-    };
-    
-    if (!rows || !columns || !values) {
-      return <div>Missing heatmap data</div>;
+    // Extract heatmap structure — handle both direct and wrapped data
+    let heatmapData: any = data;
+    if (heatmapData && !Array.isArray(heatmapData) && typeof heatmapData === 'object') {
+      const inner = (heatmapData as Record<string, any>).data;
+      if (inner && !Array.isArray(inner) && inner.rows) {
+        heatmapData = inner;
+      }
     }
 
-    const maxValue = Math.max(...values.flat());
-    const minValue = Math.min(...values.flat());
+    // Type guard
+    if (!heatmapData || Array.isArray(heatmapData)) {
+      return <div className="text-gray-500 font-mono text-xs p-4">Invalid heatmap data format</div>;
+    }
+
+    const { rows, columns, values } = heatmapData as {
+      rows?: string[];
+      columns?: string[];
+      values?: number[][]
+    };
+
+    if (!rows || !columns || !values || values.length === 0) {
+      return <div className="text-gray-500 font-mono text-xs p-4">Missing heatmap data</div>;
+    }
+
+    const allValues = values.flat();
+    const maxValue = Math.max(...allValues);
+    const minValue = Math.min(...allValues);
+    const range = maxValue - minValue || 1;
 
     const getColor = (value: number) => {
-      const normalized = (value - minValue) / (maxValue - minValue);
-      const intensity = Math.floor(255 * (1 - normalized));
-      return `rgb(${intensity}, ${255 - intensity/2}, ${intensity})`;
+      const normalized = (value - minValue) / range;
+      // Gradient from dark teal (low) to bright emerald (high)
+      const r = Math.floor(13 + (16 - 13) * normalized);
+      const g = Math.floor(148 + (185 - 148) * (1 - normalized));
+      const b = Math.floor(136 + (129 - 136) * normalized);
+      const opacity = 0.3 + normalized * 0.7;
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     };
 
     return (
@@ -292,9 +411,9 @@ export function DynamicChart({
           <table className="border-collapse">
             <thead>
               <tr>
-                <th className="border border-border p-2 text-xs font-medium">Gene</th>
+                <th className="border border-gray-800 bg-gray-950 p-2 text-xs font-medium text-gray-400 sticky left-0">Variant</th>
                 {columns.map((col: string) => (
-                  <th key={col} className="border border-border p-2 text-xs font-medium">
+                  <th key={col} className="border border-gray-800 bg-gray-950 p-2 text-xs font-medium text-gray-400">
                     {col}
                   </th>
                 ))}
@@ -303,25 +422,25 @@ export function DynamicChart({
             <tbody>
               {rows.map((row: string, i: number) => (
                 <tr key={row}>
-                  <td className="border border-border p-2 text-xs font-medium">
+                  <td className="border border-gray-800 bg-gray-950 p-2 text-xs font-medium text-gray-300 sticky left-0 whitespace-nowrap">
                     {row}
                   </td>
                   {values[i].map((value: number, j: number) => (
                     <td
                       key={j}
-                      className="border border-border p-2 text-xs text-center"
-                      style={{ backgroundColor: getColor(value) }}
-                      title={`${value.toFixed(2)}`}
+                      className="border border-gray-800 p-2 text-xs text-center font-mono"
+                      style={{ backgroundColor: getColor(value), color: value > (maxValue * 0.6) ? '#fff' : '#9ca3af' }}
+                      title={`${rows[i]} | ${columns[j]}: ${value.toFixed(2)}`}
                     >
-                      {value > 4 ? '>4' : value.toFixed(1)}
+                      {value >= 6 ? 'N/A' : value.toFixed(1)}
                     </td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Scale: -log10(AF) - Higher values indicate rarer variants
+          <div className="mt-2 text-xs text-gray-600 font-mono">
+            Scale: -log10(AF) · Higher values = rarer variants · N/A = not detected
           </div>
         </div>
       </div>
@@ -333,27 +452,27 @@ export function DynamicChart({
     if (!normalizedData || normalizedData.length === 0) {
       return <div>No data available</div>;
     }
-    
+
     return (
       <ResponsiveContainer width={width} height={height}>
         <BarChart data={normalizedData} margin={{ top: 20, right: 30, left: 40, bottom: 80 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis 
-            dataKey="name" 
+          <XAxis
+            dataKey="name"
             angle={-45}
             textAnchor="end"
             height={120}
             tick={{ fontSize: 10 }}
             className="text-muted-foreground"
           />
-          <YAxis 
+          <YAxis
             label={{ value: 'Count', angle: -90, position: 'insideLeft' }}
             tick={{ fontSize: 11 }}
             className="text-muted-foreground"
           />
           <Tooltip content={<CustomTooltip />} />
-          <Bar 
-            dataKey="value" 
+          <Bar
+            dataKey="value"
             fill={colors[2]}
             radius={[4, 4, 0, 0]}
           />
